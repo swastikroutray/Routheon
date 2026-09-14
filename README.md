@@ -142,3 +142,14 @@ Routheon/
 ├── .gitignore
 └── README.md
 ```
+## Why Routheon?
+
+Most LLM applications directly call a single model or provider.
+
+Routheon introduces an intermediate routing layer that makes model selection an explicit engineering decision.
+
+The goal is to **use the smallest suitable model for each request while maintaining response quality**, reducing unnecessary latency and inference cost.
+
+## License
+
+This project is licensed under the MIT License.
