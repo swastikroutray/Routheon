@@ -1,191 +1,143 @@
-# LLM Router
+# Routheon
 
-A zero-cost, multi-provider LLM routing proxy with a Gemini-compatible API surface and a chat web UI styled like Google Gemini.
+### Intelligent LLM Routing for Faster, Cheaper AI Inference
 
-## What It Does
+Routheon is a **multi-provider LLM routing proxy** that analyzes incoming prompts, determines their complexity, and dynamically routes them to an appropriate language model.
 
-Every prompt is classified by complexity (3 tiers) and routed to the cheapest model that can handle it:
+Instead of sending every request to the most powerful model, Routheon uses **tier-based routing** to balance **latency, cost, and response quality**.
 
-| Tier | Complexity | Provider | Model |
-|------|-----------|----------|-------|
-| 1 | Simple (< 40 words, single question) | Gemini | `gemini-2.0-flash-lite` |
-| 2 | Moderate (summarize, compare, extract) | Groq | `llama-3.1-8b-instant` |
-| 3 | Complex (analyze, debug, step-by-step) | Gemini | `gemini-2.0-flash` |
+---
 
-A random 15% sample of tier-1/tier-2 responses are verified by re-running on the tier-3 model and scoring agreement via LLM-as-judge.
+## What is Routheon?
 
-## Architecture
+Different prompts require different levels of reasoning.
 
-```
-┌─────────────┐     ┌─────────────────────────────────────────┐
-│  React UI   │────>│  FastAPI Backend                        │
-│  (Vite)     │     │  ┌──────────┐  ┌────────┐  ┌────────┐  │
-│  port 5173  │     │  │Classifier│─>│ Router │─>│Provider│  │
-│             │     │  └──────────┘  └────────┘  └────────┘  │
-│             │     │       POST /v1/chat                     │
-│             │     │       POST /v1beta/models/{m}:gen..     │
-│             │     │       GET  /v1/stats                    │
-└─────────────┘     └─────────────────────────────────────────┘
-                              │                 │
-                    ┌─────────┘                 └──────────┐
-                    ▼                                      ▼
-              ┌──────────┐  ┌──────────┐  ┌──────────────────┐
-              │  Gemini  │  │   Groq   │  │   OpenRouter     │
-              │ Free Tier│  │ Free Tier│  │   Free Models    │
-              └──────────┘  └──────────┘  └──────────────────┘
-```
+A request like:
 
-## Quick Start
+> "What is Python?"
 
-### 1. Get Free API Keys
+doesn't need the same model as:
 
-- **Gemini**: https://aistudio.google.com/apikey
-- **Groq**: https://console.groq.com/keys
-- **OpenRouter** (optional): https://openrouter.ai/keys
+> "Debug this distributed system and explain the failure modes."
 
-### 2. Backend Setup
+Routheon acts as an intelligent layer between the application and LLM providers:
 
-```bash
-cd llm-router
+```text
+                    User
+                     │
+                     ▼
+              ┌─────────────┐
+              │   Routheon  │
+              │    Router   │
+              └──────┬──────┘
+                     │
+              Prompt Classifier
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+       Tier 1     Tier 2     Tier 3
+       Simple    Moderate    Complex
+          │          │          │
+          ▼          ▼          ▼
+       Gemini       Groq      Gemini
+          │          │          │
+          └──────────┼──────────┘
+                     ▼
+                  Response
 
-# Create .env from example
-cp .env.example .env
-# Edit .env and add your API keys
+## Key Features
 
-# Install Python dependencies
-pip install -r requirements.txt
+1) **Complexity-Aware Routing**: Classifies prompts into different reasoning tiers.
 
-# Start the backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+2) **Multi-Provider Support**: Google Gemini, Groq, OpenRouter
 
-### 3. Frontend Setup
+3) **Latency Optimization**: Simple requests can be handled by faster lightweight models.
 
-```bash
-cd llm-router/frontend
+4) **Cost-Aware Inference**: Avoids unnecessarily using high-capability models for simple tasks.
 
-# Install dependencies
-npm install
+5) **Provider Fallback**: Automatically switches to another configured provider when the preferred provider is unavailable.
 
-# Start dev server (proxies /v1/* to backend)
-npm run dev
-```
+6) **Response Verification**: A sample of lower-tier responses can be re-evaluated using a stronger model to monitor routing quality.
 
-Open http://localhost:5173 in your browser.
+7) **Routing Analytics**: Tracks latency, token usage, providers, models and request statistics.
 
-### 4. Run the Test Script
+##Routing Architecture
 
-```bash
-cd llm-router
-python test_router.py
-```
+Routheon currently uses three routing tiers:
+|  Tier   | Request Type | Example                                               |
+| ------- | ------------ | ----------------------------------------------------- |
+|  Tier 1 | Simple       | "What is an API?"                                     |
+|  Tier 2 | Moderate     | "Compare REST and GraphQL."                           |
+|  Tier 3 | Complex      | "Debug this code and explain the issue step-by-step." |
 
-## API Endpoints
+The routing configuration is separated from the application logic, allowing providers and models to be changed through configuration.
 
-### Gemini-Compatible Endpoint
+##Response Verification
 
-```bash
-# Exactly matches Google's Gemini API shape
-curl -X POST http://localhost:8000/v1beta/models/gemini-2.0-flash:generateContent \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [{
-      "parts": [{"text": "What is the capital of France?"}]
-    }]
-  }'
-```
+Routheon includes an optional verification mechanism to monitor whether routing lower-complexity requests affects response quality.
 
-Response matches Google's schema:
-```json
-{
-  "candidates": [{
-    "content": {
-      "parts": [{"text": "Paris is the capital of France."}],
-      "role": "model"
-    },
-    "finishReason": "STOP",
-    "index": 0
-  }],
-  "usageMetadata": {
-    "promptTokenCount": 8,
-    "candidatesTokenCount": 12,
-    "totalTokenCount": 20
-  },
-  "modelVersion": "gemini-2.0-flash-lite"
-}
-```
+For a sampled request:
 
-### Using with the Official google-genai SDK
+                    Original Prompt
+                          │
+                          ▼
+                    Routheon Router
+                          │
+                          ▼
+                    Lower-Tier Model
+                          │
+                    Original Answer
+                          │
+                          ▼
+                  ┌───────────────┐
+                  │ Stronger Model│
+                  │   + Judge     │
+                  └───────┬───────┘
+                          │
+                          ▼
+                    Agreement Check
 
-```python
-from google import genai
+This creates a feedback mechanism for evaluating the quality of routing decisions.
 
-client = genai.Client(
-    api_key="anything",  # not used, but required by SDK
-    http_options={"api_version": "v1beta", "base_url": "http://localhost:8000"},
-)
+##Tech Stack
 
-response = client.models.generate_content(
-    model="gemini-2.0-flash",  # requested model - routing ignores this
-    contents="Explain quantum computing",
-)
-print(response.text)
-```
+**Backend**: Python, FastAPI, Uvicorn, HTTPX, SQLite / aiosqlite, PyYAML
 
-### Frontend Chat Endpoint
+**Frontend**: React, Vite, JavaScript, Tailwind CSS
 
-```bash
-curl -X POST http://localhost:8000/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello!", "history": []}'
-```
+**LLM Providers**: Google Gemini, Groq, OpenRouter
 
-### Stats Dashboard
+##Project Structure
 
-```bash
-curl http://localhost:8000/v1/stats
-```
+Routheon/
+│
+├── app/
+│   ├── main.py
+│   ├── config.py
+│   ├── routing.yaml
+│   ├── classifier.py
+│   ├── translator.py
+│   ├── verifier.py
+│   ├── db.py
+│   │
+│   └── providers/
+│       ├── gemini.py
+│       ├── groq.py
+│       └── openrouter.py
+│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── App.jsx
+│   │   ├── api.js
+│   │   └── main.jsx
+│   │
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+│
+├── requirements.txt
+├── .gitignore
+└── README.md
 
-## Project Structure
-
-```
-llm-router/
-  app/
-    config.py           # Environment variable loading
-    routing.yaml        # Tier → provider/model mapping
-    classifier.py       # Rule-based prompt complexity classifier
-    translator.py       # Gemini API schema translation
-    verifier.py         # Async response quality verification
-    db.py               # SQLite logging and stats
-    main.py             # FastAPI application
-    providers/
-      base.py           # Abstract provider interface
-      gemini.py         # Google Gemini (raw HTTP)
-      groq.py           # Groq (OpenAI-compatible)
-      openrouter.py     # OpenRouter (OpenAI-compatible)
-  frontend/
-    src/
-      App.jsx           # Root component
-      api.js            # Backend API helpers
-      components/
-        Sidebar.jsx     # Collapsible chat history sidebar
-        Header.jsx      # App header with dark mode toggle
-        ChatArea.jsx    # Message list + input
-        EmptyState.jsx  # Welcome screen with suggestions
-        MessageBubble.jsx   # User/assistant messages with typing effect
-        RoutingDetails.jsx  # Expandable routing metadata
-        InputBar.jsx    # Auto-growing input with send button
-        StatsWidget.jsx # Sidebar cost-savings dashboard
-  requirements.txt
-  test_router.py        # 10-prompt test script
-  docker-compose.yml
-  .env.example
-  README.md
-```
-
-## Cost
-
-**$0.** All providers are free tier:
-- Gemini free tier: 15 RPM for Flash, 30 RPM for Flash-Lite
-- Groq free tier: 30 RPM for Llama models
-- OpenRouter: selected free models (not used in default config)
