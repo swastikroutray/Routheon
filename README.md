@@ -73,7 +73,7 @@ Routheon currently uses three routing tiers:
 
 The routing configuration is separated from the application logic, allowing providers and models to be changed through configuration.
 
-##Response Verification
+## Response Verification
 
 Routheon includes an optional verification mechanism to monitor whether routing lower-complexity requests affects response quality.
 
@@ -100,7 +100,7 @@ For a sampled request:
 ```
 This creates a feedback mechanism for evaluating the quality of routing decisions.
 
-##Tech Stack
+## Tech Stack
 
 **Backend**: Python, FastAPI, Uvicorn, HTTPX, SQLite / aiosqlite, PyYAML
 
@@ -108,7 +108,7 @@ This creates a feedback mechanism for evaluating the quality of routing decision
 
 **LLM Providers**: Google Gemini, Groq, OpenRouter
 
-##Project Structure
+## Project Structure
 ```text
 Routheon/
 │
