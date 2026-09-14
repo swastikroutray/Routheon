@@ -1,0 +1,18 @@
+tiers:
+  1:
+    provider: gemini
+    model: gemini-3.1-flash-lite
+
+  2:
+    provider: groq
+    model: openai/gpt-oss-20b
+
+  3:
+    provider: gemini
+    model: gemini-3.5-flash
+
+verifier_model:
+  provider: gemini
+  model: gemini-3.5-flash
+
+verification_sample_rate: 0.15
