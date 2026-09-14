@@ -44,8 +44,7 @@ Routheon acts as an intelligent layer between the application and LLM providers:
           └──────────┼──────────┘
                      ▼
                   Response
-
-'''
+```
 
 ## Key Features
 
@@ -79,7 +78,7 @@ The routing configuration is separated from the application logic, allowing prov
 Routheon includes an optional verification mechanism to monitor whether routing lower-complexity requests affects response quality.
 
 For a sampled request:
-
+```text
                     Original Prompt
                           │
                           ▼
@@ -98,7 +97,7 @@ For a sampled request:
                           │
                           ▼
                     Agreement Check
-
+```
 This creates a feedback mechanism for evaluating the quality of routing decisions.
 
 ##Tech Stack
