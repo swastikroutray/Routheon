@@ -4,18 +4,11 @@
 
 @layer base {
   body {
-    @apply bg-white dark:bg-[#1e1f20] text-[#1f1f1f] dark:text-[#e3e3e3] antialiased;
+    @apply bg-claude-bg text-claude-text font-sans antialiased;
   }
-
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-600 rounded-full;
-  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-claude-border rounded-full; }
 }
 
 @keyframes blink {
@@ -25,10 +18,9 @@
 .typing-cursor::after {
   content: '\258a';
   animation: blink 1s infinite;
-  @apply text-blue-500 ml-0.5;
+  @apply text-claude-accent ml-0.5;
 }
 
-/* Smooth expand/collapse for routing details */
 .details-enter {
   max-height: 0;
   opacity: 0;

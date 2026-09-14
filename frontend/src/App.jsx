@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import ChatArea from './components/ChatArea'
@@ -9,20 +9,19 @@ function generateId() {
 }
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode')
-    return saved ? JSON.parse(saved) : false
-  })
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [conversations, setConversations] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [loading, setLoading] = useState(false)
+  const abortRef = useRef(null)
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
-  // Apply dark mode class
+  // Force dark mode permanently (keeps any remaining dark: variants in Sidebar/ChatArea working)
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode)
-    localStorage.setItem('darkMode', JSON.stringify(darkMode))
-  }, [darkMode])
+    document.documentElement.classList.add('dark')
+  }, [])
 
   // Get active conversation
   const activeConversation = conversations.find((c) => c.id === activeId)
@@ -64,12 +63,11 @@ export default function App() {
       setConversations((prev) =>
         prev.map((c) => {
           if (c.id !== convId) return c
-          const updated = {
+          return {
             ...c,
             title: c.messages.length === 0 ? text.slice(0, 40) : c.title,
             messages: [...c.messages, userMsg, assistantPlaceholder],
           }
-          return updated
         })
       )
 
@@ -83,14 +81,14 @@ export default function App() {
           content: m.content,
         }))
 
-        const data = await sendMessage(text, history)
-
+        const controller = new AbortController()
+        abortRef.current = controller
+        const data = await sendMessage(text, history, controller.signal)
         // Replace placeholder with real response
         setConversations((prev) =>
           prev.map((c) => {
             if (c.id !== convId) return c
             const msgs = [...c.messages]
-            // Find the last assistant placeholder
             const lastIdx = msgs.length - 1
             if (msgs[lastIdx]?.isStreaming) {
               msgs[lastIdx] = {
@@ -112,7 +110,7 @@ export default function App() {
           })
         )
       } catch (err) {
-        // Replace placeholder with error message
+        const aborted = err.name === 'AbortError'
         setConversations((prev) =>
           prev.map((c) => {
             if (c.id !== convId) return c
@@ -121,7 +119,7 @@ export default function App() {
             if (msgs[lastIdx]?.isStreaming || msgs[lastIdx]?.content === '') {
               msgs[lastIdx] = {
                 role: 'assistant',
-                content: `Sorry, something went wrong: ${err.message}`,
+                content: aborted ? 'Response stopped.' : `Sorry, something went wrong: ${err.message}`,
                 isStreaming: false,
                 metadata: null,
               }
@@ -130,6 +128,7 @@ export default function App() {
           })
         )
       } finally {
+        abortRef.current = null
         setLoading(false)
       }
     },
@@ -159,16 +158,17 @@ export default function App() {
 
       <main className="flex-1 flex flex-col min-w-0">
         <Header
-          darkMode={darkMode}
-          onToggleDark={() => setDarkMode((d) => !d)}
+          sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((s) => !s)}
         />
         <ChatArea
-          messages={activeConversation?.messages || []}
-          onSend={handleSend}
-          onSuggestionClick={handleSend}
-          loading={loading}
-        />
+            messages={activeConversation?.messages || []}
+            onSend={handleSend}
+            onStop={handleStop}
+            onSuggestionClick={handleSend}
+            loading={loading}
+          />
+
       </main>
     </div>
   )
